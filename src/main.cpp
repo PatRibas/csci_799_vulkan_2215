@@ -20,6 +20,7 @@
 // these include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/gtx/normal.hpp>
 
 // GLM includes
 #define GLM_FORCE_RADIANS
@@ -29,9 +30,21 @@
 
 
 struct UniformBufferObject {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
+    
+    alignas(16) glm::vec3 ambient;
+    alignas(16) glm::vec3 lightPos;
+    alignas(16) glm::vec3 lightColor;
+
+    alignas(16) glm::vec3 baseColor;
+    alignas(16) glm::vec3 specColor;
+
+    alignas(4) float ka;
+    alignas(4) float kd;
+    alignas(4) float ks;
+    alignas(4) float ke;
 };
 
 struct QueueFamilyIndices {
@@ -51,7 +64,7 @@ struct SwapChainSupportDetails {
 
 struct Vertex {
     glm::vec3 pos;
-    glm::vec3 color;
+    glm::vec3 normal;
     
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -67,13 +80,13 @@ struct Vertex {
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
         attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
+        attributeDescriptions[1].offset = offsetof(Vertex, normal);
 
         return attributeDescriptions;
     }
@@ -143,17 +156,10 @@ private:
     const uint32_t WIDTH = 800;
     const uint32_t HEIGHT = 600;
 
-    // hard-coded vertices, for now
-    const std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-        {{0.5f, -0.5f, 0.0f},  {1.0f, 0.0f, 1.0f}},
-        {{0.5f, 0.5f, 0.0f},   {1.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f, 0.0f},  {1.0f, 1.0f, 1.0f}},
-    };
+    std::vector<Vertex> vertices;
 
-    const std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0, 
-    };
+    std::vector<uint16_t> indices;
+       
 
 
     // other
@@ -721,7 +727,7 @@ private:
             rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         }
         rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.cullMode = VK_CULL_MODE_NONE;//VK_CULL_MODE_BACK_BIT;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
         rasterizer.depthBiasConstantFactor = 0.0f; // Optional
@@ -1192,7 +1198,7 @@ private:
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
         uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -1223,10 +1229,23 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
     
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));// * glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1; // y coord upside down
+
+        ubo.ambient = glm::vec3(0.0, 0.0, 0.0);
+        ubo.lightPos = glm::vec3(0.0, 2.0, 2.0);
+        ubo.lightColor = glm::vec3(1.0, 1.0, 1.0);
+        //ubo.lightPos = glm::vec3(glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::vec4(ubo.lightPos, 1.0));
+
+        ubo.baseColor = glm::vec3(1.0, 1.0, 0.0); 
+        ubo.specColor = glm::vec3(1.0, 1.0, 1.0);
+
+        ubo.ka = 1.0f;
+        ubo.kd = 1.0f; 
+        ubo.ks = 1.0f;
+        ubo.ke = 1.0f;
 
         void* data;
         vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
@@ -1283,6 +1302,49 @@ private:
         }        
     }
 
+    void createVerticesAndIndices()
+    {
+        std::vector<glm::vec3> hard_coded_face{
+            {-0.5f, -0.5f, 0.0f}, 
+            {0.5f, -0.5f, 0.0f},  
+            {0.5f, 0.5f, 0.0f},  
+            {0.5f, 0.5f, 0.0f}, 
+            {-0.5f, 0.5f, 0.0f},
+            {-0.5f, -0.5f, 0.0f},
+        };
+
+        //vertices.resize( hard_coded_face.size() );
+        for ( uint32_t i = 0; i < hard_coded_face.size() - 2; i += 3 )
+        {
+            glm::vec3 p1 = hard_coded_face[i];
+            glm::vec3 p2 = hard_coded_face[i + 1];
+            glm::vec3 p3 = hard_coded_face[i + 2];
+            glm::vec3 normal = glm::triangleNormal(p1, p2, p3);  
+            Vertex v1, v2, v3;
+            v1.pos = p1;
+            v1.normal = normal;
+            v2.pos = p2;
+            v2.normal = normal;
+            v3.pos = p3;
+            v3.normal = normal;
+            vertices.push_back( v1 );
+            vertices.push_back( v2 );
+            vertices.push_back( v3 );
+        }
+
+        std::vector<uint16_t> index_list{
+            0, 1, 2, 3, 4, 5,
+            //0, 1, 2, 2, 3, 0, 
+        };
+
+        //indices.resize( index_list.size() );
+        for ( uint16_t idx : index_list )
+        {
+            indices.push_back(idx);
+        }
+
+    }
+
     // Event loop
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
@@ -1305,6 +1367,7 @@ private:
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPool();
+        createVerticesAndIndices();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
