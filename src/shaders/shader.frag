@@ -33,5 +33,5 @@ void main() {
     vec3 ambient = uniforms.ka * uniforms.ambient * uniforms.baseColor;
     vec3 diffuse = uniforms.kd * uniforms.lightColor * uniforms.baseColor * max(dot(L, N), 0.0);
     vec3 spec = uniforms.ks * uniforms.specColor * uniforms.lightColor * pow(max(dot(R, V), 0.0), uniforms.ke);
-    outColor = vec4(ambient + diffuse + spec, 1.0) / 2.0 + texture(texSampler, fragTexCoord * 2.0) / 2.0;
+    outColor = vec4(ambient + diffuse + spec, 1.0) / 2.0 + texture(texSampler, fragTexCoord) / 2.0;
 }
