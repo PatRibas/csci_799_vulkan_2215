@@ -2,10 +2,12 @@
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
+layout(location = 2) in vec2 inTexCoord;
 
 layout(location = 0) out vec3 N;
 layout(location = 1) out vec3 L;
 layout(location = 2) out vec3 V;
+layout(location = 3) out vec2 fragTexCoord;
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
@@ -38,5 +40,6 @@ void main() {
     L = normalize(lcam - vcam);
     V = -normalize(vcam);
 
+    fragTexCoord = inTexCoord;
     gl_Position = uniforms.proj * uniforms.view * uniforms.model * vec4(inPosition, 1.0);
 }
