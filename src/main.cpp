@@ -729,7 +729,7 @@ private:
             rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         }
         rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VK_CULL_MODE_NONE;//VK_CULL_MODE_BACK_BIT;
+        rasterizer.cullMode = VK_CULL_MODE_NONE; //VK_CULL_MODE_BACK_BIT;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
         rasterizer.depthBiasConstantFactor = 0.0f; // Optional
@@ -1345,26 +1345,51 @@ private:
     void createVerticesAndIndices()
     {
         std::vector<glm::vec3> hard_coded_face{
-            {-0.5f, -0.5f, 0.0f}, 
-            {0.5f, -0.5f, 0.0f},  
-            {0.5f, 0.5f, 0.0f},  
-            {0.5f, 0.5f, 0.0f}, 
-            {-0.5f, 0.5f, 0.0f},
-            {-0.5f, -0.5f, 0.0f},
+            // top, bottom
+            {-0.5f, -0.5f, 0.5f}, 
+            {0.5f, -0.5f, 0.5f},  
+            {0.5f, 0.5f, 0.5f},  
+            {0.5f, 0.5f, 0.5f}, 
+            {-0.5f, 0.5f, 0.5f},
+            {-0.5f, -0.5f, 0.5f},
 
-            {-0.5f, -0.5f, -1.0f}, 
-            {0.5f, -0.5f, -1.0f},  
-            {0.5f, 0.5f, -1.0f},  
-            {0.5f, 0.5f, -1.0f}, 
-            {-0.5f, 0.5f, -1.0f},
-            {-0.5f, -0.5f, -1.0f},
+            {-0.5f, -0.5f, -0.5f}, 
+            {0.5f, -0.5f, -0.5f},  
+            {0.5f, 0.5f, -0.5f},  
+            {0.5f, 0.5f, -0.5f}, 
+            {-0.5f, 0.5f, -0.5f},
+            {-0.5f, -0.5f, -0.5f},
         };
 
-        for ( uint32_t i = 0; i < hard_coded_face.size() - 2; i += 3 )
+        std::vector<glm::vec3> vertex_list;
+
+        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        for ( uint32_t i = 0; i < 12; i++ )
         {
-            glm::vec3 p1 = hard_coded_face[i];
-            glm::vec3 p2 = hard_coded_face[i + 1];
-            glm::vec3 p3 = hard_coded_face[i + 2];
+            glm::vec3 vertex = hard_coded_face[i];
+            vertex_list.push_back( glm::vec3(rotation * glm::vec4(vertex, 1.0)) );
+        }
+
+        rotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        for ( uint32_t i = 0; i < 12; i++ )
+        {
+            glm::vec3 vertex = hard_coded_face[i];
+            vertex_list.push_back( glm::vec3(rotation * glm::vec4(vertex, 1.0)) );
+        }
+
+        rotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        for ( uint32_t i = 0; i < 12; i++ )
+        {
+            glm::vec3 vertex = hard_coded_face[i];
+            vertex_list.push_back( glm::vec3(rotation * glm::vec4(vertex, 1.0)) );
+        }
+
+
+        for ( uint32_t i = 0; i < vertex_list.size() - 2; i += 3 )
+        {
+            glm::vec3 p1 = vertex_list[i];
+            glm::vec3 p2 = vertex_list[i + 1];
+            glm::vec3 p3 = vertex_list[i + 2];
             glm::vec3 normal = glm::triangleNormal(p1, p2, p3);  
             Vertex v1, v2, v3;
             v1.pos = p1;
@@ -1378,25 +1403,20 @@ private:
             vertices.push_back( v3 );
         }
 
-        vertices[0].texCoord = {1.0f, 0.0f};
-        vertices[1].texCoord = {0.0f, 0.0f};
-        vertices[2].texCoord = {0.0f, 1.0f};
-        vertices[3].texCoord = {0.0f, 1.0f};
-        vertices[4].texCoord = {1.0f, 1.0f};
-        vertices[5].texCoord = {1.0f, 0.0f};
+        for ( uint32_t i = 0; i < vertices.size(); i += 6) {
+            vertices[i].texCoord = {1.0f, 0.0f};
+            vertices[i + 1].texCoord = {0.0f, 0.0f};
+            vertices[i + 2].texCoord = {0.0f, 1.0f};
+            vertices[i + 3].texCoord = {0.0f, 1.0f};
+            vertices[i + 4].texCoord = {1.0f, 1.0f};
+            vertices[i + 5].texCoord = {1.0f, 0.0f};
+        }
 
-        vertices[6].texCoord = {1.0f, 0.0f};
-        vertices[7].texCoord = {0.0f, 0.0f};
-        vertices[8].texCoord = {0.0f, 1.0f};
-        vertices[9].texCoord = {0.0f, 1.0f};
-        vertices[10].texCoord = {1.0f, 1.0f};
-        vertices[11].texCoord = {1.0f, 0.0f};
-
-        std::vector<uint16_t> index_list{
-            0, 1, 2, 3, 4, 5,
-            6, 7, 8, 9, 10, 11
-            //0, 1, 2, 2, 3, 0, 
-        };
+        std::vector<uint16_t> index_list;
+        for ( uint16_t i = 0; i < vertices.size(); i++ )
+        {
+            index_list.push_back(i);
+        }
 
         for ( uint16_t idx : index_list )
         {
