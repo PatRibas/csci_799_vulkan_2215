@@ -1,0 +1,50 @@
+#version 450
+
+#define WIDTH 800
+#define HEIGHT 600
+#define WORKGROUP_SIZE 32
+
+layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
+
+layout(binding = 0) buffer buf
+{
+   vec4 imageData[];
+};
+
+
+void main() {
+    if(gl_GlobalInvocationID.x >= WIDTH || gl_GlobalInvocationID.y >= HEIGHT) {
+        return;
+    }
+    /*
+
+    uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
+
+    if ( x < WIDTH / 2 )
+    {
+        imageData[WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = vec4(1.0, 1.0, 0.0, 1.0);
+    }
+    else 
+    {
+        imageData[WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = vec4(1.0, 0.0, 0.0, 1.0);
+    }*/
+
+    vec2 norm_coordinates = (gl_GlobalInvocationID.xy + vec2(0.5)) / vec2(WIDTH, HEIGHT);
+    vec2 c = (norm_coordinates - vec2(0.5)) * 2.0 - vec2(1.0, 0.0);
+
+    vec2 z = vec2(0.0, 0.0);
+    float i;
+    for (i = 0.0; i < 1.0; i += 0.005) {
+        z = vec2(
+            cos(z.x * z.x) - cos(z.y * z.y) + c.x,
+            sin(z.y * z.x) + sin(z.x * z.y) + c.y
+        );
+
+        if (length(z) > 4.0) {
+            break;
+        }
+    }
+
+    imageData[WIDTH * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = vec4(vec3(i, i, 0.0), 1.0);
+}

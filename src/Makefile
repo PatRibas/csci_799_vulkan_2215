@@ -6,6 +6,10 @@ VulkanTest: main.cpp
 	g++ $(CFLAGS) -o VulkanTest main.cpp $(LDFLAGS)
 .PHONY: test clean
 
+compute: compute.cpp
+	glslc ./shaders/shader.comp -o ./shaders/comp.spv
+	g++ $(CFLAGS) -o compute compute.cpp $(LDFLAGS)
+
 test: VulkanTest
 	./VulkanTest
 
