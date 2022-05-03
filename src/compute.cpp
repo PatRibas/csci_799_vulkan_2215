@@ -23,6 +23,9 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+// totally yoinked this from the Sascha Willems examples
+// If you look at main.cpp, every Vulkan function can fail
+// so this if statement is super common
 #define VK_CHECK_RESULT(f) 																				\
 {																										\
     VkResult res = (f);																					\
@@ -34,6 +37,8 @@ const bool enableValidationLayers = true;
 }
 
 
+// these two functions are from my raytracer
+// they make a PPM image given a buffer of colors
 int color_to_int( double color )
 {
 	double max = 255.0f;
@@ -123,6 +128,9 @@ public:
         cleanup();
     }
 
+    // This function maps the memory from the GPU to the CPU
+    // something hardware can do via a DMA - direct memory access
+    // but there are bits that make the CPU and GPU memory coherent
     void saveImage() {
         void* mappedMemory = NULL;
         vkMapMemory(device, bufferMemory, 0, bufferSize, 0, &mappedMemory);
@@ -154,6 +162,7 @@ public:
         write_to_ppm(filename, pixels); 
     }
 
+    // also yoinked this function
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
         VkDebugReportFlagsEXT                       flags,
         VkDebugReportObjectTypeEXT                  objectType,
@@ -169,6 +178,7 @@ public:
         return VK_FALSE;
      }
 
+    // create a Vulkan instance
     void createInstance() {
         std::vector<const char *> enabledExtensions;
 
@@ -252,6 +262,10 @@ public:
     
     }
 
+    // we technically need to do this check
+    // but there aren't any features we need to check for if we aren't rendering anything!
+    // if a GPU doesn't support compute shaders it's probably decades old at this point 
+    // and probably also doesn't support Vulkan
     void findPhysicalDevice() {
 
         uint32_t deviceCount;
@@ -271,6 +285,8 @@ public:
         }
     }
 
+    // only one index to search for if we are running a compute pipeline!
+    // Just gotta find which one is the compute index
     uint32_t getComputeQueueFamilyIndex() {
         uint32_t queueFamilyCount;
 
@@ -295,6 +311,7 @@ public:
         return i;
     }
 
+    // Logical device creation
     void createDevice() {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -320,6 +337,8 @@ public:
         vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
     }
 
+    // Memory type is used in buffer creation
+    // nothing important here though
     uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties) {
         VkPhysicalDeviceMemoryProperties memoryProperties;
 
@@ -334,6 +353,7 @@ public:
         return -1;
     }
 
+    // Setup and calling for our compute buffer
     void createBuffer() {
 
         VkBufferCreateInfo bufferCreateInfo = {};
@@ -359,6 +379,8 @@ public:
         VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
     }
 
+    // This is a pipeline requirement
+    // but we don't use any descriptors
     void createDescriptorSetLayout() {
 
         VkDescriptorSetLayoutBinding descriptorSetLayoutBinding = {};
@@ -375,6 +397,9 @@ public:
         VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
     }
 
+    // Again, we need to do this
+    // but there aren't any resources in the GPU not directly exposed to our shader (e.g. a loaded texture)
+    // so there's not much going on here
     void createDescriptorSet() {
 
         VkDescriptorPoolSize descriptorPoolSize = {};
@@ -415,6 +440,7 @@ public:
         vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
     }
 
+    // simple if you can read C
     uint32_t* readFile(uint32_t& length, const char* filename) {
 
         FILE* fp = fopen(filename, "rb");
@@ -440,6 +466,7 @@ public:
         return (uint32_t *)str;
     }
 
+    // The function! Much smaller than a graphics pipeline
     void createComputePipeline() {
 
         uint32_t filelength;
@@ -476,6 +503,7 @@ public:
             NULL, &pipeline));
     }
 
+    // We still need commands if we are going to do anything!
     void createCommandBuffer() {
 
         VkCommandPoolCreateInfo commandPoolCreateInfo = {};
@@ -500,12 +528,13 @@ public:
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-
+        // Notice - not draw! Compute shaders are ispatched with work group sizes
         vkCmdDispatch(commandBuffer, (uint32_t)ceil(WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(HEIGHT / float(WORKGROUP_SIZE)), 1);
 
         VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer)); 
     }
 
+    // A separate function that does this can make more sense in the brain for handling parallel resources
     void runCommandBuffer() {
 
 

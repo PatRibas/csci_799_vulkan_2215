@@ -1,3 +1,28 @@
+/**
+ * @file main.cpp
+ * @author Patrick Ribas
+ * @brief 
+ * @version 0.1
+ * @date 2022-05-03
+ * 
+ * This file is sparsely documented.
+ * The report goes more in-depth as to what these functions actually do,
+ * but with the verbosity of Vulkan functions, if you want to know what 
+ * a line of code is doing, then simply consulting the standard
+ * will give you the gist of it. The general functionality of 
+ * thousands of lines of Vulkan is probably not something you 
+ * can figure out without outside resources.
+ * 
+ * Most functions generally follows the following structure:
+ *   instantiate some vulkan struct for some Object
+ *   populate its members
+ *   call vkCreateObject
+ * 
+ * if you know what's happening with the pipeline, you can figure out generally what and why these functions exist
+ * In that sense, many of these functions are self-documenting, as the documentation exists
+ * but the *why* is not always as clear.
+ */
+
 //#include <vulkan/vulkan.h> // included by GLFW
 
 // C++ libraries
@@ -38,6 +63,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 
+// If you don't make sure your objects are aligned, your shaders may not read from the right part of memory!
+// Shaders assume some padding on 4 byte boundaries.
 struct UniformBufferObject {
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
@@ -204,6 +231,7 @@ private:
      * Functions                                *
      ********************************************/
 
+    // This function is only used to read SPIRV shaders as binary objects.
     static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -232,6 +260,7 @@ private:
 
     }
 
+    // This is used by debug callbacks in validation layers.
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
         auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
@@ -271,20 +300,6 @@ private:
             createInfo.enabledLayerCount = 0;
             createInfo.pNext = nullptr;
         }
-
-/*
-        // check for extra extensions!
-        uint32_t extensionCount = 0;
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-        std::cout << "available extensions:\n";
-
-        // print what's available
-        for (const auto& extension : extensions) {
-            std::cout << '\t' << extension.extensionName << '\n';
-        }
-*/
         
         // setup is done! time to instantiate Vulkan
         if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
@@ -320,9 +335,10 @@ private:
         }
 
         return true;
-
     }
 
+    // Not every physical device supports a swap chain explicitly!
+    // This function helps 
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
         SwapChainSupportDetails details;
 
@@ -347,6 +363,8 @@ private:
         return details;
     }
 
+    // While this program doesn't do anything particularly complex, GLFW may expect some number of extensions
+    // in order to function, and when we check physical device properties and extension support, we need these to run.
     std::vector<const char*> getRequiredExtensions() {
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
@@ -408,6 +426,7 @@ private:
         }
     }
 
+    // There's not much of a check here! But we need to pick some Vulkan-supported device on our machine.
     void pickPhysicalDevice() {
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
@@ -433,6 +452,8 @@ private:
 
     }
 
+    // The check for our physical device. We only care about swap chain support and GLFW extensions.
+    // THe discrete GPU check is unneccesary, but I added it to avoid using my Intel CPU's GPU.
     bool isDeviceSuitable(VkPhysicalDevice device) {
         QueueFamilyIndices indices = findQueueFamilies(device);
 
@@ -453,6 +474,7 @@ private:
         return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;  
     }
 
+    // Basic check
     bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -469,7 +491,7 @@ private:
         return requiredExtensions.empty();
     }
 
-
+    // Queue families are things like graphics, presentation, compute, etc.
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
         QueueFamilyIndices indices;
 
@@ -511,6 +533,8 @@ private:
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
+    // The extent of a swap chain is its size. This wouldn't normally be its own function, but 
+    // as Vulkan has its own VkExtend2D object, this function is re-called if the window is resized. 
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
         if (capabilities.currentExtent.width != UINT32_MAX) {
             return capabilities.currentExtent;
@@ -531,6 +555,7 @@ private:
         }
     }
 
+    // Creates the logical handle to our physical device. Most Vulkan code will require this device somehow.
     void createLogicalDevice() {
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
@@ -575,7 +600,7 @@ private:
         vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
 
-
+    // The swap chain has color space info and other formatting info explicitly specified.
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
         for (const auto& availableFormat : availableFormats) {
             if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -585,13 +610,15 @@ private:
         return availableFormats[0];
     }
 
-
+    // GLFW does this for us!
     void createSurface() {
         if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
             throw std::runtime_error("failed to create window surface!");
         }
     }
 
+    // Since this is a Vulkan function you can call, most of this function is just struct setup and
+    // then calling the vkCreateSwapchain function.
     void createSwapChain() {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
@@ -650,6 +677,7 @@ private:
         swapChainExtent = extent;
     }
 
+    // Image views allow us to interact with GPU images through the CPU. Not directly, but we need these.
     void createImageViews() {
         swapChainImageViews.resize(swapChainImages.size());
 
@@ -658,6 +686,7 @@ private:
         }
     }
 
+    // Shader modules are attached to the pipeline.
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -672,8 +701,10 @@ private:
         return shaderModule;
     }
 
-
+    // The monster function!
+    // Easily the most important function in the file.
     void createGraphicsPipeline() {
+        // shader construction
         auto vertShaderCode = readFile("shaders/vert.spv");
         auto fragShaderCode = readFile("shaders/frag.spv");
 
@@ -702,6 +733,7 @@ private:
         vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
+        // configurable pipeline stage creation and configuration
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -788,6 +820,7 @@ private:
         depthStencil.front = {}; // Optional
         depthStencil.back = {}; // Optional
 
+        // actual pipeline creation
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
@@ -819,16 +852,19 @@ private:
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
         pipelineInfo.basePipelineIndex = -1; // Optional
         
-
+        // so many structs... just for this?
         if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("failed to create graphics pipeline!");
         }
 
+        // once shaders are attached, we don't need to leave these hanging around in RAM
+        // the pipeline will clean up its own shader objects when it's cleaned up
         vkDestroyShaderModule(device, fragShaderModule, nullptr);
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-
+    // Render passes describe the structure of what we are going to do
+    // if we don't specify things like depth subpasses, we won't have depth buffering
     void createRenderPass() {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapChainImageFormat;
@@ -891,6 +927,7 @@ private:
     }
 
 
+    // Frame buffers have to be explicitly attached to some image view
     void createFramebuffers() {
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -915,6 +952,7 @@ private:
         }
     }
 
+    // Command pools? Think like thread pool. A place where we can allocate command buffers.
     void createCommandPool() {
         QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
 
@@ -928,6 +966,8 @@ private:
         }
     }
 
+    // These are where we actually submit commands that do things!
+    // Without these, we wouldn't run any code.
     void createCommandBuffers() {
         commandBuffers.resize(swapChainFramebuffers.size());
 
@@ -964,6 +1004,8 @@ private:
             renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
             renderPassInfo.pClearValues = clearValues.data();
 
+            // THESE LINES ACTUALLY DO THINGS
+            // vkCmdXYZ is something that will actually run on the GPU
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
             
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
@@ -987,6 +1029,10 @@ private:
 
     }
 
+    // Some of these are mandatory. The Vulkan standard has state that it expects before and after a shader.
+    // If you screw up a mandatory structure, you will have a validation layer shout at you.
+    // But if you screw it up bad enough, you can deadlock the GPU, and hear nothing.
+    // You can also create wrong sync states that aren't against the standard, and create deadlock, but not get yelled at.
     void createSyncObjects() {
         imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1013,7 +1059,10 @@ private:
         }
     }
 
-
+    // There are three things happening here.
+    // One: make sure the swapchain doesn't need to be updated (e.g. window resize).
+    // Two: see if we need to update anything on the GPU. Usually, that's just uniforms (e.g. descriptors).
+    // Three: don't do any of this out of sync! You can't submit commands to the GPU if it's doing work.
     void drawFrame() {
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -1164,7 +1213,7 @@ private:
         vkBindBufferMemory(device, buffer, bufferMemory, 0);
     }
 
-
+    // The index buffer lets us reuse vertices. Useful for models that we load, where vertices are on average a part of 3 triangles.
     void createIndexBuffer() {
         VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
@@ -1185,7 +1234,7 @@ private:
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-
+    // The vertices! Very necessary
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -1220,6 +1269,7 @@ private:
         throw std::runtime_error("failed to find suitable memory type!");
     }
 
+    // Descriptors are used for uniforms
     void createDescriptorSetLayout() {
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
@@ -1265,7 +1315,7 @@ private:
     
         UniformBufferObject ubo{};
         ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(5.0, 5.0, 5.0)) * glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1; // y coord upside down
 
@@ -1352,6 +1402,8 @@ private:
         }        
     }
 
+    // This function is really hacky
+    // but it makes a cube with some tranformations
     void createVerticesAndIndices()
     {
         std::vector<glm::vec3> hard_coded_face{
@@ -1435,10 +1487,11 @@ private:
 
     }
 
+    // Loads in a texture image!
     void createTextureImage() {
         int texWidth, texHeight, texChannels;
-        //stbi_uc* pixels = stbi_load("textures/glasses.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load("textures/glasses.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        //stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         if (!pixels) {
@@ -1466,6 +1519,8 @@ private:
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
+    // This is specifically an image on the GPU. It does not necessarily have anything to do with texture images.
+    // Images are distinct from buffers as they support things like color spaces
     void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1501,6 +1556,11 @@ private:
         vkBindImageMemory(device, image, imageMemory, 0);
     }
 
+    // Usually, a command buffer leaves the same commands (e.g. draw) in the buffer for the GPU to come back to.
+    // This is because the command that a GPU receives does not change per frame, or even that often.
+    // You usually just want to draw something.
+    // But if you want to do something once, that's not quite right.
+    // The next two functions allocate a command, do that command, wait for the gpu, and remove that command.
     VkCommandBuffer beginSingleTimeCommands() {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1534,6 +1594,7 @@ private:
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
+    // Similar to many other functions, this function sets up and executes a Vulkan function.
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -1566,6 +1627,11 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
+    // One of the strangest functions in the file.
+    // There are different layouts that an image can be in. 
+    // A GPU may want to have an image in the order [pixel0, pixel8, pixel16, ...] for hardware reasons
+    // but for display the image must be in order.
+    // This function takes the layout an image is in and changes it ot a new one.
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
@@ -1634,6 +1700,7 @@ private:
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
+    // Image views are like handles for the CPU to interact with GPU images.
     VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1776,8 +1843,8 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        //createVerticesAndIndices();
-        loadModel();
+        createVerticesAndIndices();
+        //loadModel();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
