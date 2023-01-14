@@ -1802,6 +1802,8 @@ private:
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
                 };
+                // Not all OBJ files have texture coordinates, so this line can segfault
+
 /*
                 vertex.texCoord = {
                     attrib.texcoords[2 * index.texcoord_index + 0],
